@@ -198,7 +198,7 @@ class EmailInteraction:
     type: InteractionType
     # from_: Person = field(metadata=config(field_name="from"))
     from_: Person
-    to: list[Person] 
+    to_: list[Person]
     cc: list[Person]
     direction: DirectionType
 

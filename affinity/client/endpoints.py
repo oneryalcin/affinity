@@ -562,11 +562,15 @@ class Interactions(Endpoint):
         super().__init__(token)
 
     @staticmethod
-    def _adjust_from_data(data):
+    def _adjust_data(data):
         for entry in data:
             # Rename 'from' key to 'from_'
             if 'from' in entry:
                 entry['from_'] = entry.pop('from')
+
+            if 'to' in entry:
+                entry['to_'] = entry.pop('to')
+
         return data
 
     def parse_list(self, response: r.Response) -> dict:
@@ -580,7 +584,7 @@ class Interactions(Endpoint):
 
         elif self.type == InteractionType.email:
             return {
-                "interactions": [models.EmailInteraction(**i) for i in self._adjust_from_data(data["emails"])],
+                "interactions": [models.EmailInteraction(**i) for i in self._adjust_data(data["emails"])],
                 "next_page_token": data["next_page_token"]
             }
 
