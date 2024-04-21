@@ -405,6 +405,23 @@ class Persons(Endpoint):
         query_params = {k: v for k, v in locals().items() if k not in ["self", "person_id"] and v is not None}
         return self._get(query_params=query_params)
 
+    def get_by_email(self, email: str, with_interaction_dates: Optional[bool] = None,
+                     with_interaction_persons: Optional[bool] = None, with_opportunities: Optional[bool] = None,
+                     with_current_organizations: bool = None):
+
+        # https://api.affinity.co/persons?term=john@doe.ch
+        query_params = {k: v for k, v in locals().items() if k not in ["self", "email"] and v is not None}
+        query_params.update({"term": email})
+        person_candidates = self._list(query_params=query_params).get('persons')
+        if not person_candidates:
+            return None
+        for person in person_candidates:
+            if email in person.emails:
+                if with_interaction_dates or with_interaction_persons or with_opportunities or with_current_organizations:
+                    return self.get(person.id, with_interaction_dates, with_interaction_persons, with_opportunities)
+                return person
+
+
     def parse_get(self, response: r.Response, **kwargs) -> models.Person | List[models.PersonFields]:
         if kwargs.get('is_fields'):
             return [models.PersonFields(**i) for i in response.json()]
@@ -593,8 +610,8 @@ class Interactions(Endpoint):
 
     def list(
             self,
-            start_time: dt.datetime = dt.datetime.now() - dt.timedelta(days=3560),    # 10 years roughly
-            end_time: dt.datetime = dt.datetime.now() + dt.timedelta(days=365),      # 1 year roughly
+            start_time: dt.datetime = dt.datetime.now() - dt.timedelta(days=3560),  # 10 years roughly
+            end_time: dt.datetime = dt.datetime.now() + dt.timedelta(days=365),  # 1 year roughly
             person_id: Optional[int] = None,
             organization_id: Optional[int] = None,
     ):
