@@ -88,7 +88,7 @@ class Endpoint:
         url = self.construct_url(query_params)
         response = r.get(url=url, auth=("", self.token), allow_redirects=True)
         if response.status_code != 200:
-            raise RequestFailed({"status_code": response.status_code, "content": response.content})
+            raise RequestFailed(message=response.content, status_code=response.status_code)
         return self.parse_get(response, **kwargs)
 
     def parse_get(self, response: r.Response, **kwargs):

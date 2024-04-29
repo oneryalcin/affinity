@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name='affinity-crm',
-        version='v1.1.11',
+        version='v1.1.12',
         description='Affinity CRM',
         author='Nathan Duncan & Mehmet Oner Yalcin',
         author_email='natefduncan@gmail.com, oneryalcin@gmail.com',
