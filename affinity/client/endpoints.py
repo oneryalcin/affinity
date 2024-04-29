@@ -3,48 +3,31 @@ from __future__ import annotations
 import mimetypes
 import datetime as dt
 import io
-import urllib
+import requests
 
 import requests as r
 from enum import Enum
 from dataclasses import asdict
 from typing import List, Optional, Dict
 
-# from loguru import logger
-# from tenacity import (
-#     retry,
-#     stop_after_attempt,
-#     wait_random_exponential,
-#     retry_if_exception, retry_if_exception_type,
-# )
+import backoff
 
-from affinity.common.exceptions import (TokenMissing, RequestTypeNotAllowed, RequestFailed,
-                                        RequiredPayloadFieldMissing, RequiredQueryParamMissing, ClientError)
+from loguru import logger
+
+from affinity.common.exceptions import (
+    TokenMissing,
+    RequestTypeNotAllowed,
+    RequestFailed,
+    RequiredPayloadFieldMissing,
+    RequiredQueryParamMissing,
+    ClientError,
+    RateLimitExceeded
+)
 from affinity.common.constants import EntityType, InteractionType, ReminderResetType, ReminderType, ValueType
 from affinity.core import models
 
 BASE_URL = "https://api.affinity.co"
 
-
-# class retry_if_http_429_error(retry_if_exception):
-#     """Retry strategy that retries if the exception is an ``HTTPError`` with
-#     a 429 status code.
-#     """
-#
-#     def __init__(self):
-#         def is_http_429_error(exception):
-#             logger.info(f"Retrying due to HTTP 429 error: {exception}")
-#             return (
-#                     isinstance(exception, urllib.error.HTTPError) and
-#                     exception.getcode() == 429
-#             )
-#
-#         super().__init__(predicate=is_http_429_error)
-#
-#
-# # Combining retry conditions: rate limit errors or connection errors
-# retry_condition = retry_if_exception(retry_if_http_429_error) | retry_if_exception_type(r.exceptions.ConnectionError)
-#
 
 class RequestType(Enum):
     GET = 1
@@ -71,11 +54,13 @@ class Endpoint:
             if r not in params:
                 raise RequiredQueryParamMissing(r)
 
-    # @retry(
-    #     retry=retry_condition,
-    #     wait=wait_random_exponential(min=1, max=60),
-    #     stop=stop_after_attempt(10)
-    # )
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _get(self, query_params: Optional[dict] = None, **kwargs):
 
         query_params = query_params if query_params else {}
@@ -87,8 +72,12 @@ class Endpoint:
         self.verify_query_params(query_params)
         url = self.construct_url(query_params)
         response = r.get(url=url, auth=("", self.token), allow_redirects=True)
+
         if response.status_code != 200:
-            raise RequestFailed({"status_code": response.status_code, "content": response.content})
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
         return self.parse_get(response, **kwargs)
 
     def parse_get(self, response: r.Response, **kwargs):
@@ -96,7 +85,13 @@ class Endpoint:
         response.raise_for_status()
         return response.json()
 
-    # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _download(self, save_path: str):
         if not self.token:
             raise TokenMissing
@@ -105,7 +100,10 @@ class Endpoint:
         url = self.construct_url({})
         response = r.get(url=url, auth=("", self.token), allow_redirects=True)
         if response.status_code != 200:
-            raise RequestFailed(response.content)
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
         return self.parse_download(response, save_path)
 
     def parse_download(self, response: r.Response, save_path: str):
@@ -113,7 +111,13 @@ class Endpoint:
         with open(save_path, "wb") as file:
             file.write(response.content)
 
-    # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _list(self, query_params: dict):
         if not self.token:
             raise TokenMissing
@@ -123,7 +127,10 @@ class Endpoint:
         url = self.construct_url(query_params)
         response = r.get(url=url, auth=("", self.token))
         if response.status_code != 200:
-            raise RequestFailed(response.content)
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
         return self.parse_list(response)
 
     def list(self, query_params: dict = {}):
@@ -133,6 +140,13 @@ class Endpoint:
         # Assume 200 status code
         return response.json()
 
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _create(self, payload: dict):
         if not self.token:
             raise TokenMissing
@@ -142,7 +156,10 @@ class Endpoint:
         url = self.construct_url({})
         response = r.post(url=url, json=payload, headers=headers, auth=("", self.token))
         if response.status_code != 200:
-            raise RequestFailed(response.content)
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
         return self.parse_create(response)
 
     def create(self, payload: dict = {}):
@@ -152,6 +169,13 @@ class Endpoint:
         # Assume 200 status code
         return response.json()
 
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _upload(self, files: dict, form: dict):
         if not self.token:
             raise TokenMissing
@@ -163,11 +187,24 @@ class Endpoint:
         for file_name, file in files.items():
             response = r.post(url=url, files={"file": (file_name, file, mimetypes.guess_type(file_name)[0])},
                               params=form, auth=("", self.token))
+
             if response.status_code != 200:
-                raise RequestFailed(response.content)
+                if response.status_code == 429:
+                    raise RateLimitExceeded(message=str(response.content),
+                                            retry_after=response.headers.get("Retry-After"))
+                else:
+                    raise RequestFailed(message=str(response.content), status_code=response.status_code)
+
             responses.append(self.parse_create(response))
         return responses
 
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _delete(self):
         if not self.token:
             raise TokenMissing
@@ -175,14 +212,26 @@ class Endpoint:
             raise RequestTypeNotAllowed
         url = self.construct_url({})
         response = r.delete(url=url, auth=("", self.token))
+
         if response.status_code != 200:
-            raise RequestFailed(response.content)
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
+
         return self.parse_delete(response)
 
     def parse_delete(self, response: r.Response):
         # Assume 200 status code
         return response.json()
 
+    @backoff.on_exception(
+        backoff.expo,
+        exception=RateLimitExceeded,
+        max_tries=5,
+        giveup=lambda e: e.response is not None and e.response.status_code != 429,
+        logger=logger
+    )
     def _update(self, payload: dict):
         if not self.token:
             raise TokenMissing
@@ -191,8 +240,13 @@ class Endpoint:
         headers = {"Content-Type": "application/json"}
         url = self.construct_url(payload)
         response = r.put(url=url, auth=("", self.token), headers=headers)
+
         if response.status_code != 200:
-            raise RequestFailed(response.content)
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
+
         return self.parse_update(response)
 
     def parse_update(self, response: r.Response):

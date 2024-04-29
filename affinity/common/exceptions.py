@@ -1,17 +1,42 @@
-class TokenMissing(Exception):
+from __future__ import annotations
+
+from typing import Optional
+
+
+class AffinityBaseException(Exception):
     pass
 
-class RequestTypeNotAllowed(Exception):
+
+class TokenMissing(AffinityBaseException):
     pass
 
-class RequestFailed(Exception):
+
+class RequestTypeNotAllowed(AffinityBaseException):
     pass
 
-class RequiredPayloadFieldMissing(Exception):
+
+class RequestFailed(AffinityBaseException):
+    """ An exception raised when a request fails """
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        self.message = message
+        self.status_code = status_code
     pass
 
-class RequiredQueryParamMissing(Exception):
+
+class RateLimitExceeded(AffinityBaseException):
+    """ An exception raised when a rate limit is exceeded """
+    def __init__(self, message: str, retry_after: int | None = None):
+        self.message = message
+        self.retry_after = retry_after
+
+
+class RequiredPayloadFieldMissing(AffinityBaseException):
     pass
 
-class ClientError(Exception):
+
+class RequiredQueryParamMissing(AffinityBaseException):
+    pass
+
+
+class ClientError(AffinityBaseException):
     pass
