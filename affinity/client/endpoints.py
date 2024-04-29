@@ -10,13 +10,13 @@ from enum import Enum
 from dataclasses import asdict
 from typing import List, Optional, Dict
 
-from loguru import logger
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_random_exponential,
-    retry_if_exception, retry_if_exception_type,
-)
+# from loguru import logger
+# from tenacity import (
+#     retry,
+#     stop_after_attempt,
+#     wait_random_exponential,
+#     retry_if_exception, retry_if_exception_type,
+# )
 
 from affinity.common.exceptions import (TokenMissing, RequestTypeNotAllowed, RequestFailed,
                                         RequiredPayloadFieldMissing, RequiredQueryParamMissing, ClientError)
@@ -26,25 +26,25 @@ from affinity.core import models
 BASE_URL = "https://api.affinity.co"
 
 
-class retry_if_http_429_error(retry_if_exception):
-    """Retry strategy that retries if the exception is an ``HTTPError`` with
-    a 429 status code.
-    """
-
-    def __init__(self):
-        def is_http_429_error(exception):
-            logger.info(f"Retrying due to HTTP 429 error: {exception}")
-            return (
-                    isinstance(exception, urllib.error.HTTPError) and
-                    exception.getcode() == 429
-            )
-
-        super().__init__(predicate=is_http_429_error)
-
-
-# Combining retry conditions: rate limit errors or connection errors
-retry_condition = retry_if_exception(retry_if_http_429_error) | retry_if_exception_type(r.exceptions.ConnectionError)
-
+# class retry_if_http_429_error(retry_if_exception):
+#     """Retry strategy that retries if the exception is an ``HTTPError`` with
+#     a 429 status code.
+#     """
+#
+#     def __init__(self):
+#         def is_http_429_error(exception):
+#             logger.info(f"Retrying due to HTTP 429 error: {exception}")
+#             return (
+#                     isinstance(exception, urllib.error.HTTPError) and
+#                     exception.getcode() == 429
+#             )
+#
+#         super().__init__(predicate=is_http_429_error)
+#
+#
+# # Combining retry conditions: rate limit errors or connection errors
+# retry_condition = retry_if_exception(retry_if_http_429_error) | retry_if_exception_type(r.exceptions.ConnectionError)
+#
 
 class RequestType(Enum):
     GET = 1
@@ -71,11 +71,11 @@ class Endpoint:
             if r not in params:
                 raise RequiredQueryParamMissing(r)
 
-    @retry(
-        retry=retry_condition,
-        wait=wait_random_exponential(min=1, max=60),
-        stop=stop_after_attempt(10)
-    )
+    # @retry(
+    #     retry=retry_condition,
+    #     wait=wait_random_exponential(min=1, max=60),
+    #     stop=stop_after_attempt(10)
+    # )
     def _get(self, query_params: Optional[dict] = None, **kwargs):
 
         query_params = query_params if query_params else {}
@@ -88,7 +88,7 @@ class Endpoint:
         url = self.construct_url(query_params)
         response = r.get(url=url, auth=("", self.token), allow_redirects=True)
         if response.status_code != 200:
-            raise RequestFailed(response.content)
+            raise RequestFailed({"status_code": response.status_code, "content": response.content})
         return self.parse_get(response, **kwargs)
 
     def parse_get(self, response: r.Response, **kwargs):
@@ -96,7 +96,7 @@ class Endpoint:
         response.raise_for_status()
         return response.json()
 
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
+    # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
     def _download(self, save_path: str):
         if not self.token:
             raise TokenMissing
@@ -113,7 +113,7 @@ class Endpoint:
         with open(save_path, "wb") as file:
             file.write(response.content)
 
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
+    # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
     def _list(self, query_params: dict):
         if not self.token:
             raise TokenMissing
