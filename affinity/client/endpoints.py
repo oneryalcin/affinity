@@ -57,7 +57,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
@@ -88,7 +89,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
@@ -114,7 +116,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
@@ -143,7 +146,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
@@ -172,7 +176,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
@@ -201,7 +206,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
@@ -228,7 +234,8 @@ class Endpoint:
     @backoff.on_exception(
         backoff.expo,
         exception=RateLimitExceeded,
-        max_tries=5,
+        max_tries=10,
+        max_time=50,
         giveup=lambda e: e.response is not None and e.response.status_code != 429,
         logger=logger
     )
