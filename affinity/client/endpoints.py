@@ -426,6 +426,23 @@ class FieldValues(Endpoint):
         return self._update({"value": value})
 
     # Default parse update
+    def _update(self, payload: dict):
+        if not self.token:
+            raise TokenMissing
+        if RequestType.UPDATE not in self.allowed_request_types:
+            raise RequestTypeNotAllowed
+        headers = {"Content-Type": "application/json"}
+        url = f"{BASE_URL}/{self.endpoint}"
+        body = {"value": payload["value"]}
+        response = r.put(url=url, json=body, headers=headers, auth=("", self.token))
+
+        if response.status_code != 200:
+            if response.status_code == 429:
+                raise RateLimitExceeded(message=str(response.content), retry_after=response.headers.get("Retry-After"))
+            else:
+                raise RequestFailed(message=str(response.content), status_code=response.status_code)
+
+        return self.parse_update(response)
 
     def delete(self, field_value_id: int):
         self.endpoint = f"field-values/{field_value_id}"
