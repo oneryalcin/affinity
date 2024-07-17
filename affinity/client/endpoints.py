@@ -523,7 +523,12 @@ class Persons(Endpoint):
         payload = {k: v for k, v in locals().items() if k != "self" and v != None}
         payload.pop("person_id", None)
         self.endpoint = f"persons/{person_id}"
-        return self._update(payload)
+
+        headers = {"Content-Type": "application/json"}
+        url = f"{BASE_URL}/{self.endpoint}"
+        response = r.put(url=url, json=payload, headers=headers, auth=("", self.token))
+
+        return response.json()
 
     # Default parse update
 
